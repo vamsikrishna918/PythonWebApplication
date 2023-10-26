@@ -1,0 +1,43 @@
+pipeline{
+    
+    agent any
+    stages{
+        stage("CodeCheckOut"){
+            steps{
+                git branch: 'main', url: 'https://github.com/vamsikrishna918/PythonWebApplication.git'
+            }
+        }
+        stage("ImagePrune"){
+            steps{
+                echo "**deleting the previous unused images**"
+                sh 'docker image prune -af '
+            }
+        }
+        stage("DockerImageBuild"){
+            steps{
+                sh 'docker build -t vamsi12358/flaskapplication .'
+            }
+        }
+        stage("DockerImagePush"){
+            steps{
+                withCredentials([usernamePassword(credentialsId: 'Docker username', passwordVariable: 'dockerpass', usernameVariable: 'dockeruser')]) {
+                sh "docker login -u ${dockeruser} -p ${dockerpass} docker.io"
+                echo "**Imagepush**"
+                sh 'docker push vamsi12358/flaskapplication'
+                }
+            }
+        }
+        
+        stage("Deployment and Service Apply"){
+            steps{
+                withKubeCredentials(kubectlCredentials: [[caCertificate: '', clusterName: 'sample', contextName: '', credentialsId: 'sercet-token', namespace: 'default', serverUrl: 'https://172.31.16.81:6443']]) {
+                sh 'kubectl apply -f webapp-deployment.yml'
+                echo '**Deploymet created**'
+                sh 'kubectl apply -f webapp-svc.yml'
+                echo '**Service created**'
+                }
+            }
+        }
+        
+    }
+}  
